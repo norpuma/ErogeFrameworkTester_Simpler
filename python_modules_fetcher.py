@@ -16,6 +16,9 @@ modules_with_path = {
     "CHARACTERS_BASE": {
         "path": "PowerPlayFramework/CHARACTERS_BASE/Implementations/Python/",
     },
+    "GAME_SCENES": {
+        "path": "PowerPlayFramework/GAME_SCENES/Implementations/Python/",
+    },
     "LOCATIONS": {
         "path": "PowerPlayFramework/LOCATIONS/Implementations/Python/",
     },
