@@ -51,6 +51,9 @@ import PowerPlayFramework.GAME_SCENES.Game_ScenesPy as Game_Scenes
 
 GLOBAL_DEBUG_FLAG = True
 
+class Object(object):
+    pass
+
 class Game_System(object):
     def __init__(self):
         self.protagonist = None
@@ -118,7 +121,8 @@ class Game_Base(object):
         self.active_scenes_stack.remove(active_scene)
     
     def inject_scene(self, next_scene_id, previous_context):
-        new_active_scene = self.active_scene_creator_function(next_scene_id, previous_context)
+        next_scene = Game_Base.registered_scenes[next_scene_id]
+        new_active_scene = self.active_scene_creator_function(next_scene, previous_context)
         self.active_scenes_stack.append(new_active_scene)
 
     def _select_next_active_scene(self):
@@ -140,18 +144,23 @@ class PurePython_Game_Scene(Game_Scenes.ABSTRACT_Active_Scene_Reference):
         super(PurePython_Game_Scene, self).__init__(referred_scene, scene_context)
     
     def _present(self, presentation_function):
-        presentation_function(self)
+        presentation_function(self, self.scene_context)
     
     def _get_player_input(self, input_function):
-        input_function(self)
+        input_function(self, self.scene_context)
 
-def active_scene_creator(scene_id, previous_context):
-    reference_scene = Game_Base.registered_scenes[scene_id]
+def active_scene_creator(new_scene, previous_context):
+    reference_scene = Game_Base.registered_scenes[new_scene.scene_id]
     return PurePython_Game_Scene(reference_scene, previous_context)
 
 player_action_options = dict()
 
-def DEFAULT_SCENE_presentation(context):
+def DEFAULT_SCENE_prepare_scene_and_create_context(game_scene, previous_context):
+    new_context = Object()
+    new_context.scene_changed = False
+    return new_context
+
+def DEFAULT_SCENE_presentation(game_scene, context):
     # Present current location
     if system.protagonist.location is None:
         print("[@] You are NOWHERE!!!")
@@ -184,7 +193,7 @@ def DEFAULT_SCENE_presentation(context):
         player_action_options[str(input_number)] = possible_action_key
 
 
-def DEFAULT_SCENE_input_processing(context):
+def DEFAULT_SCENE_input_processing(game_scene, context):
     print("What do you want to do?")
     player_input = input("> ")
     if player_input in player_action_options.keys():
@@ -192,12 +201,17 @@ def DEFAULT_SCENE_input_processing(context):
         Actions.Character_Action.execute_action_default_function(character_action, system.protagonist, context)
     return player_input
 
+def DEFAULT_SCENE_update_presentation(game_scene, context):
+    if context.scene_changed:
+        DEFAULT_SCENE_presentation(context)
+
 DEFAULT_SCENE = Game_Scenes.Game_Scene("SIMPLER_TESTER__Default_Scene")
 DEFAULT_SCENE.should_run_function = lambda: True
+DEFAULT_SCENE.prepare_scene_and_create_context_function = DEFAULT_SCENE_prepare_scene_and_create_context
 DEFAULT_SCENE.scene_start_presentation = DEFAULT_SCENE_presentation
 DEFAULT_SCENE.scene_update_function = None
 DEFAULT_SCENE.scene_player_input_processing_function = DEFAULT_SCENE_input_processing
-DEFAULT_SCENE.scene_update_presentation = None
+DEFAULT_SCENE.scene_update_presentation = DEFAULT_SCENE_update_presentation
 DEFAULT_SCENE.after_run_function = None
 DEFAULT_SCENE.scene_end_presentation = None
 
@@ -207,12 +221,12 @@ def should_run_introduction(introduction_scene):
     else:
         return False
 
-def introduction_scene_presentation(context = None):
+def introduction_scene_presentation(game_scene, context):
     print("\tThis is what a presentation could look like.")
     print("\tAnd here is a second line as an example.")
 
-def introduction_scene_update(context):
-    context.interrupt_scene()
+def introduction_scene_update(game_scene, context):
+    game_scene.interrupt_scene()
 
 introduction = Game_Scenes.Game_Scene("SIMPLER_TESTER__Introduction")
 introduction.should_run_function = should_run_introduction
@@ -270,6 +284,7 @@ def game_initialize():
     game.initialize()
     game.register_scene(DEFAULT_SCENE)
     game.register_scene(introduction)
+    game.inject_scene(introduction.scene_id, None)
 
 print("[+] Initializing game...")
 powerPlayFramework_initialize()

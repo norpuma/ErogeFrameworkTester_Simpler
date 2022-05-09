@@ -2,6 +2,9 @@ import uuid
 
 GLOBAL_DEBUG_FLAG = False
 
+class Object(object):
+    pass
+
 class Game_Scene(object):
     def __init__(self, scene_id = None):
         if scene_id is not None:
@@ -54,7 +57,7 @@ class ABSTRACT_Active_Scene_Reference(object):
 
     def _prepare_scene_and_create_context(self, previous_context):
         if previous_context is None:
-            previous_context = object()
+            previous_context = Object()
         new_context = None
         if self.referred_scene.prepare_scene_and_create_context_function is not None:
             new_context = self.referred_scene.prepare_scene_and_create_context_function(self, previous_context)
@@ -80,7 +83,7 @@ class ABSTRACT_Active_Scene_Reference(object):
         elif self.status is ABSTRACT_Active_Scene_Reference.UPDATE_DUE_TO_CONTEXT:
             self.status = ABSTRACT_Active_Scene_Reference.PRESENT_UPDATE
             if self.referred_scene.scene_update_function is not None:
-                self.referred_scene.scene_update_function(self)
+                self.referred_scene.scene_update_function(self, self.scene_context)
         elif self.status is ABSTRACT_Active_Scene_Reference.PRESENT_UPDATE:
             self.status = ABSTRACT_Active_Scene_Reference.UPDATE_DUE_TO_PLAYER_INPUT
             if self.referred_scene.scene_update_presentation is not None:
@@ -93,7 +96,7 @@ class ABSTRACT_Active_Scene_Reference(object):
         elif self.status is ABSTRACT_Active_Scene_Reference.SHOULD_END:
             self.status = ABSTRACT_Active_Scene_Reference.PRESENT_END
             if self.referred_scene.after_run_function is not None:
-                self.referred_scene.after_run_function(self)
+                self.referred_scene.after_run_function(self, self.scene_context)
         elif self.status is ABSTRACT_Active_Scene_Reference.PRESENT_END:
             self.status = ABSTRACT_Active_Scene_Reference.FINISHED
             if self.referred_scene.scene_end_presentation is not None:
