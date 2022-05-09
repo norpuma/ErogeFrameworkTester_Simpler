@@ -128,7 +128,10 @@ player_action_options = dict()
 
 def DEFAULT_SECENE_presentation(context):
     # Present current location
-    print("[@] You are at this location.")
+    if system.protagonist.location is None:
+        print("[@] You are NOWHERE!!!")
+    else:
+        print("[@] You are " + system.protagonist.location.in_or_at + " " + system.protagonist.location.short_name)
     # List local characters perceived
     print("[@] There is no one else here.")
     # print("[@] These are the people here: ...")
@@ -226,6 +229,13 @@ quit_game = Actions.Character_Action("SIMPLER_TESTER__Quit_Game")
 quit_game.player_menu_description = Actions.Character_Action_Description(action_description = "QUIT the GAME", action_description_kind = Actions.Character_Action_Description.ENUM__ACTION_DESCRIPTION_KINDS__TEXT)
 quit_game.execution_function = quit_game_action
 Actions.register_in_database(quit_game)
+
+## LOCATIONS
+
+unending_void = Locations.Location("SIMPLER_TESTER__Unending_Void", in_or_at = "in an", short_name = "Unending Void")
+unending_void.short_descriptor = "Emptiness infinite."
+
+protagonist.location = unending_void
 
 def powerPlayFramework_initialize():
     global system
