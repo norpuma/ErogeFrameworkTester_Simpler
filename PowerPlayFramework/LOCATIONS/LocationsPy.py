@@ -12,8 +12,9 @@ def initialize_location_on_character(character):
 
 class Location(object):
     locations_database = {}
-    def __init__(self, id):
+    def __init__(self, id, short_name):
         self.id = id
+        self.short_name = short_name
         self.short_descriptor = None
     
     def register_in_database(self):

@@ -10,15 +10,21 @@ def default_get_possible_actions(context, character):
     return Character_Action.index_of_actions_ids
 
 def default_execute_action(character_action, character, context):
-    if character_action.execution_description.action_description_kind is Character_Action_Description.ENUM__ACTION_DESCRIPTION_KINDS__FUNCTION:
-        action_description = character_action.execution_description.action_description(character_action, character, context)
+    if character_action.execution_description is not None:
+        if character_action.execution_description.action_description_kind is Character_Action_Description.ENUM__ACTION_DESCRIPTION_KINDS__FUNCTION:
+            action_description = character_action.execution_description.action_description(character_action, character, context)
+        else:
+            action_description = character_action.execution_description.action_description
     else:
-        action_description = character_action.execution_description.action_description
+        action_description = None
     character_action.execute(character, context)
-    if character_action.result_description.action_description_kind is Character_Action_Description.ENUM__ACTION_DESCRIPTION_KINDS__FUNCTION:
-        result_description = character_action.result_description.action_description(character_action, character, context)
+    if character_action.result_description is not None:
+        if character_action.result_description.action_description_kind is Character_Action_Description.ENUM__ACTION_DESCRIPTION_KINDS__FUNCTION:
+            result_description = character_action.result_description.action_description(character_action, character, context)
+        else:
+            result_description = character_action.result_description.action_description
     else:
-        result_description = character_action.result_description.action_description
+        result_description = None
     if action_description is not None:
         print(action_description)
     if result_description is not None:

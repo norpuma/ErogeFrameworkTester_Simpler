@@ -138,14 +138,23 @@ def DEFAULT_SECENE_presentation(context):
     possible_actions = Actions.Character_Action.get_possible_actions_default_function(None, system.protagonist)
     actions_count = 0
     print("[@] These are your options: ...")
-    for possible_action_key in possible_actions.keys():
+    sorted_keys = list(possible_actions.keys())
+    sorted_keys.sort()
+    for possible_action_key in sorted_keys:
         description_object = possible_actions[possible_action_key].player_menu_description
         if description_object.action_description_kind is Actions.Character_Action_Description.ENUM__ACTION_DESCRIPTION_KINDS__FUNCTION:
             text = description_object.action_description(possible_actions[possible_action_key], system.protagonist, context)
         else:
             text = description_object.action_description
-        print("[{0}] - {1}".format(actions_count, text))
-        player_action_options[str(actions_count)] = possible_action_key
+        input_number = -1
+        if possible_action_key is not quit_game.id:
+            input_number = actions_count
+            actions_count += 1
+        else:
+            input_number = 999
+        print("[{0}] - {1}".format(input_number, text))
+        player_action_options[str(input_number)] = possible_action_key
+
 
 def DEFAULT_SECENE_input_processing(context):
     print("What do you want to do?")
@@ -209,6 +218,14 @@ examine_self.player_menu_description = Actions.Character_Action_Description(acti
 examine_self.execution_description = Actions.Character_Action_Description(action_description = "You look at yourself.", action_description_kind = Actions.Character_Action_Description.ENUM__ACTION_DESCRIPTION_KINDS__TEXT)
 examine_self.result_description = Actions.Character_Action_Description(action_description = examine_self_action, action_description_kind = Actions.Character_Action_Description.ENUM__ACTION_DESCRIPTION_KINDS__FUNCTION)
 Actions.register_in_database(examine_self)
+
+def quit_game_action(character_action, character, context):
+    game.stop_game = True
+
+quit_game = Actions.Character_Action("SIMPLER_TESTER__Quit_Game")
+quit_game.player_menu_description = Actions.Character_Action_Description(action_description = "QUIT the GAME", action_description_kind = Actions.Character_Action_Description.ENUM__ACTION_DESCRIPTION_KINDS__TEXT)
+quit_game.execution_function = quit_game_action
+Actions.register_in_database(quit_game)
 
 def powerPlayFramework_initialize():
     global system

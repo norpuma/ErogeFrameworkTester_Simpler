@@ -184,7 +184,7 @@ class Character_Names(object):
         self.standard = None
         self.individual_name = None
         self.family_name = None
-        self.custom_full_name = None
+        self.custom_full_name_function = None
     
     @property
     def first(self):
@@ -196,8 +196,8 @@ class Character_Names(object):
     
     @property
     def full(self):
-        if self.custom_full_name is not None:
-            return self.custom_full_name(self)
+        if self.custom_full_name_function is not None:
+            return self.custom_full_name_function(self)
         else:
             return Character_Names.full_name_default_function(self)
     
