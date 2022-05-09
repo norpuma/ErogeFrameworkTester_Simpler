@@ -62,9 +62,12 @@ class Game_System(object):
 
 class Game_Base(object):
     registered_scenes = {}
-    def __init__(self, default_scene):
+    def __init__(self, active_scene_creator_function, default_scene = None):
+        self.active_scene_creator_function = active_scene_creator_function
         self.default_scene = default_scene
         self.stop_game = False
+        self.active_scenes_stack = []
+        self.active_scene = None
     
     def initialize(self):
         pass
@@ -72,43 +75,69 @@ class Game_Base(object):
     def register_scene(self, scene_object):
         Game_Base.registered_scenes[scene_object.scene_id] = scene_object
     
-    def game_loop_start(self):
-        self._loop_start_updates()
-        game_scene = self.select_next_scene()
-        if game_scene is not None:
-            self._start_scene(game_scene)
+    def game_loop(self):
+        if self.stop_game == True:
             return
+        if self._check_for_scene_interruption() == True:
+            self._interrupt_scene_with_another(self._select_next_active_scene())
+        if self.active_scene is None:
+            self.active_scene = self._select_next_active_scene()
+            return
+        if self.active_scene.status == Game_Scenes.ABSTRACT_Active_Scene_Reference.FINISHED:
+            self._finish_scene(self.active_scene)
+            self.active_scene = self._select_next_active_scene()
+            return
+        elif self.active_scene.status == Game_Scenes.ABSTRACT_Active_Scene_Reference.WAITING_FOR_NEXT_SCENE:
+            self.inject_scene(self.active_scene.next_scene_id, self.active_scene.scene_context)
+            return
+        else: # All other active scene statuses
+            self.active_scene.run()
+
+    def _check_for_scene_interruption(self):
+        if len(self.active_scenes_stack) < 1:
+            return False
+        candidate_scene = self.active_scenes_stack[-1]
+        if self.active_scene is not candidate_scene:
+            return True
         else:
-            self._start_scene(self.default_scene)
-        return
+            return False
 
-    def game_loop_handle_input(self):
-        pass
+    def _interrupt_scene_with_another(self, candidate_scene):
+        if self.active_scene is not None and self.active_scene.status != Game_Scenes.ABSTRACT_Active_Scene_Reference.FINISHED:
+            self.active_scene.set_scene_switch(candidate_scene.referred_scene.scene_id)
+        self.active_scene = candidate_scene
 
-    def game_loop_end(self):
-        self._loop_end_updates()
-        pass
+    def _get_previous_context(self):
+        if len(self.active_scenes_stack) >= 2:
+            previous_context = self.active_scenes_stack[-2].scene_context
+        else: 
+            previous_context = None
+        return previous_context
+    
+    def _finish_scene(self, active_scene):
+        self.active_scenes_stack.remove(active_scene)
+    
+    def inject_scene(self, next_scene_id, previous_context):
+        new_active_scene = self.active_scene_creator_function(next_scene_id, previous_context)
+        self.active_scenes_stack.append(new_active_scene)
 
-    def _loop_start_updates(self):
-        pass
-
-    def select_next_scene(self):
-        for scene_key in Game_Base.registered_scenes.keys():
-            return Game_Base.registered_scenes[scene_key]
-
-    def _loop_end_updates(self):
-        pass
-
-    def _start_scene(self, scene_object):
-        scene_object.status = Game_Scenes.ABSTRACT_Game_Scene.READY_TO_START
-        while scene_object.status is not Game_Scenes.ABSTRACT_Game_Scene.FINISHED:
-            scene_object.run()
+    def _select_next_active_scene(self):
+        if len(self.active_scenes_stack) < 1:
+            if self.default_scene is None:
+                self.stop_game = True
+                return None
+            else:
+                previous_context = None
+                if self.active_scene is not None:
+                    previous_context = self.active_scene.scene_context
+                self.inject_scene(self.default_scene.scene_id, previous_context)
+        return self.active_scenes_stack[-1]
 
 ## SCENES
 
-class PurePython_Game_Scene(Game_Scenes.ABSTRACT_Game_Scene):
-    def __init__(self):
-        super(PurePython_Game_Scene, self).__init__()
+class PurePython_Game_Scene(Game_Scenes.ABSTRACT_Active_Scene_Reference):
+    def __init__(self, referred_scene, scene_context):
+        super(PurePython_Game_Scene, self).__init__(referred_scene, scene_context)
     
     def _present(self, presentation_function):
         presentation_function(self)
@@ -116,17 +145,13 @@ class PurePython_Game_Scene(Game_Scenes.ABSTRACT_Game_Scene):
     def _get_player_input(self, input_function):
         input_function(self)
 
-def DEFAULT_SECENE_before(context):
-    context.loop_count = 0
-
-def DEFAULT_SECENE_update(context):
-    context.loop_count += 1
-    if context.loop_count > 1:
-        context.interrupt_scene()
+def active_scene_creator(scene_id, previous_context):
+    reference_scene = Game_Base.registered_scenes[scene_id]
+    return PurePython_Game_Scene(reference_scene, previous_context)
 
 player_action_options = dict()
 
-def DEFAULT_SECENE_presentation(context):
+def DEFAULT_SCENE_presentation(context):
     # Present current location
     if system.protagonist.location is None:
         print("[@] You are NOWHERE!!!")
@@ -159,7 +184,7 @@ def DEFAULT_SECENE_presentation(context):
         player_action_options[str(input_number)] = possible_action_key
 
 
-def DEFAULT_SECENE_input_processing(context):
+def DEFAULT_SCENE_input_processing(context):
     print("What do you want to do?")
     player_input = input("> ")
     if player_input in player_action_options.keys():
@@ -167,25 +192,20 @@ def DEFAULT_SECENE_input_processing(context):
         Actions.Character_Action.execute_action_default_function(character_action, system.protagonist, context)
     return player_input
 
-DEFAULT_SECENE = PurePython_Game_Scene()
-DEFAULT_SECENE.should_run_function = lambda: True
-DEFAULT_SECENE.before_run_function = DEFAULT_SECENE_before
-DEFAULT_SECENE.scene_start_presentation = DEFAULT_SECENE_presentation
-DEFAULT_SECENE.scene_update_function = DEFAULT_SECENE_update
-DEFAULT_SECENE.scene_player_input_processing_function = DEFAULT_SECENE_input_processing
-DEFAULT_SECENE.scene_update_presentation = None
-DEFAULT_SECENE.after_run_function = None
-DEFAULT_SECENE.scene_end_presentation = None
+DEFAULT_SCENE = Game_Scenes.Game_Scene("SIMPLER_TESTER__Default_Scene")
+DEFAULT_SCENE.should_run_function = lambda: True
+DEFAULT_SCENE.scene_start_presentation = DEFAULT_SCENE_presentation
+DEFAULT_SCENE.scene_update_function = None
+DEFAULT_SCENE.scene_player_input_processing_function = DEFAULT_SCENE_input_processing
+DEFAULT_SCENE.scene_update_presentation = None
+DEFAULT_SCENE.after_run_function = None
+DEFAULT_SCENE.scene_end_presentation = None
 
 def should_run_introduction(introduction_scene):
     if "ran_once" not in introduction_scene.__dir__() or introduction_scene.ran_once is None or introduction_scene.ran_once is False:
         return True
     else:
         return False
-
-def after_run_introduction(introduction_scene):
-    introduction_scene.ran_once = True
-    Game_Base.registered_scenes.pop(introduction_scene.scene_id)
 
 def introduction_scene_presentation(context = None):
     print("\tThis is what a presentation could look like.")
@@ -194,15 +214,15 @@ def introduction_scene_presentation(context = None):
 def introduction_scene_update(context):
     context.interrupt_scene()
 
-introduction = PurePython_Game_Scene()
+introduction = Game_Scenes.Game_Scene("SIMPLER_TESTER__Introduction")
 introduction.should_run_function = should_run_introduction
-introduction.before_run_function = None
 introduction.scene_start_presentation = introduction_scene_presentation
 introduction.scene_update_function = introduction_scene_update
 introduction.scene_player_input_processing_function = None
 introduction.scene_update_presentation = None
-introduction.after_run_function = after_run_introduction
+introduction.after_run_function = None
 introduction.scene_end_presentation = None
+
 
 ## CHARACTERS
 prot_name = Names.Character_Names()
@@ -246,8 +266,9 @@ def powerPlayFramework_initialize():
 
 def game_initialize():
     global game
-    game = Game_Base(DEFAULT_SECENE)
+    game = Game_Base(active_scene_creator, DEFAULT_SCENE)
     game.initialize()
+    game.register_scene(DEFAULT_SCENE)
     game.register_scene(introduction)
 
 print("[+] Initializing game...")
@@ -255,6 +276,4 @@ powerPlayFramework_initialize()
 print("[+] Game initialized...")
 #print(Characters.Character.examine_character_default_function(system.protagonist))
 while not game.stop_game:
-    game.game_loop_start()
-    game.game_loop_handle_input()
-    game.game_loop_end()
+    game.game_loop()
