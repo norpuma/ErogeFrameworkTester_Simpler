@@ -12,8 +12,6 @@ class Game_Scene(object):
         else:
             self.scene_id = uuid.uuid4()
     
-        self.should_run_function = None
-
         self.prepare_scene_and_create_context_function = None
         self.scene_start_presentation = None
 
@@ -21,15 +19,11 @@ class Game_Scene(object):
         self.scene_player_input_processing_function = None
         self.scene_update_presentation = None
 
+        self.resume_after_scene_switch_function = None
+
         self.after_run_function = None
         self.scene_end_presentation = None
-    
-    def should_run(self):
-        if self.should_run_function is not None:
-            return self.should_run_function(self)
-        else:
-            return False
-    
+
 class ABSTRACT_Active_Scene_Reference(object):
     READY_TO_START = "READY_TO_START"
     PRESENT_START = "PRESENT_START"
@@ -116,4 +110,6 @@ class ABSTRACT_Active_Scene_Reference(object):
     def resume_after_scene_switch(self, returning_context):
         self.status = self.next_status_before_switch
         self.next_status_before_switch = None
-        self.next_scene_id = None
+        returned_scene_id = self.next_scene_id
+        if self.referred_scene.resume_after_scene_switch_function is not None:
+            self.referred_scene.resume_after_scene_switch_function(self.scene_context, returned_scene_id, returning_context)

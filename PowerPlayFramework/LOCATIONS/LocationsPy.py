@@ -10,8 +10,12 @@ def initalize_system(character_class_to_have_location):
 def initialize_location_on_character(character):
     character.location = Location()
 
+def default_reachable_locations(character, context):
+    return list(Location.locations_database.keys())
+
 class Location(object):
     locations_database = {}
+    reachable_locations_default_function = default_reachable_locations
     def __init__(self, id, in_or_at, short_name):
         self.id = id
         self.in_or_at = in_or_at

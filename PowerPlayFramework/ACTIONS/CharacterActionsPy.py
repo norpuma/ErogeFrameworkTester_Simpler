@@ -7,7 +7,12 @@
 ## DEPENDENCIES: Character
 
 def default_get_possible_actions(context, character):
-    return Character_Action.index_of_actions_ids
+    result = {}
+    for action_id in Character_Action.index_of_actions_ids.keys():
+        character_action = Character_Action.index_of_actions_ids[action_id]
+        if character_action.check_action_is_possible(character, context):
+            result[action_id] = character_action
+    return result
 
 def default_execute_action(character_action, character, context):
     if character_action.execution_description is not None:

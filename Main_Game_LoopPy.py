@@ -106,7 +106,7 @@ class Game_Base(object):
             return False
 
     def _interrupt_scene_with_another(self, candidate_scene):
-        if self.active_scene is not None and self.active_scene.status != Game_Scenes.ABSTRACT_Active_Scene_Reference.FINISHED:
+        if self.active_scene is not None and self.active_scene.status != Game_Scenes.ABSTRACT_Active_Scene_Reference.FINISHED and self.active_scene.status != Game_Scenes.ABSTRACT_Active_Scene_Reference.WAITING_FOR_NEXT_SCENE:
             self.active_scene.set_scene_switch(candidate_scene.referred_scene.scene_id)
         self.active_scene = candidate_scene
 
@@ -119,6 +119,9 @@ class Game_Base(object):
     
     def _finish_scene(self, active_scene):
         self.active_scenes_stack.remove(active_scene)
+        next_active_scene = self._select_next_active_scene()
+        if next_active_scene is not None and next_active_scene.status == Game_Scenes.ABSTRACT_Active_Scene_Reference.WAITING_FOR_NEXT_SCENE:
+            next_active_scene.resume_after_scene_switch(active_scene.scene_context)
     
     def inject_scene(self, next_scene_id, previous_context):
         next_scene = Game_Base.registered_scenes[next_scene_id]
@@ -153,11 +156,11 @@ def active_scene_creator(new_scene, previous_context):
     reference_scene = Game_Base.registered_scenes[new_scene.scene_id]
     return PurePython_Game_Scene(reference_scene, previous_context)
 
-player_action_options = dict()
-
 def DEFAULT_SCENE_prepare_scene_and_create_context(game_scene, previous_context):
     new_context = Object()
     new_context.scene_changed = False
+    new_context.switch_scene_new_scene_id = None
+    new_context.player_action_options = dict()
     return new_context
 
 def DEFAULT_SCENE_presentation(game_scene, context):
@@ -170,11 +173,10 @@ def DEFAULT_SCENE_presentation(game_scene, context):
     print("[@] There is no one else here.")
     # print("[@] These are the people here: ...")
     # Ask for Action
-    global player_action_options
-    player_action_options = dict()
+    context.player_action_options = dict()
     possible_actions = Actions.Character_Action.get_possible_actions_default_function(None, system.protagonist)
     actions_count = 0
-    print("[@] These are your options: ...")
+    print("[@] These are your options are the following:")
     sorted_keys = list(possible_actions.keys())
     sorted_keys.sort()
     for possible_action_key in sorted_keys:
@@ -189,37 +191,42 @@ def DEFAULT_SCENE_presentation(game_scene, context):
             actions_count += 1
         else:
             input_number = 999
-        print("[{0}] - {1}".format(input_number, text))
-        player_action_options[str(input_number)] = possible_action_key
+        print("  [{0}] - {1}".format(input_number, text))
+        context.player_action_options[str(input_number)] = possible_action_key
 
 
 def DEFAULT_SCENE_input_processing(game_scene, context):
     print("What do you want to do?")
     player_input = input("> ")
-    if player_input in player_action_options.keys():
-        character_action = Actions.Character_Action.index_of_actions_ids[player_action_options[player_input]]
+    if player_input in context.player_action_options.keys():
+        character_action = Actions.Character_Action.index_of_actions_ids[context.player_action_options[player_input]]
         Actions.Character_Action.execute_action_default_function(character_action, system.protagonist, context)
+    else:
+        print("ERROR: Unknown option. Please select a valid option.")
     return player_input
+
+def DEFAULT_SCENE_update(game_scene, context):
+    if context.switch_scene_new_scene_id is not None:
+        context.actor = system.protagonist
+        game_scene.set_scene_switch(context.switch_scene_new_scene_id)
 
 def DEFAULT_SCENE_update_presentation(game_scene, context):
     if context.scene_changed:
-        DEFAULT_SCENE_presentation(context)
+        DEFAULT_SCENE_presentation(game_scene, context)
+
+def DEFAULT_SCENE_resume_after_scene_switch(current_context, game_scene_id, context):
+    if game_scene_id == "SIMPLER_TESTER__Travel_to_Location" and context.location_changed:
+        current_context.scene_changed = True
 
 DEFAULT_SCENE = Game_Scenes.Game_Scene("SIMPLER_TESTER__Default_Scene")
-DEFAULT_SCENE.should_run_function = lambda: True
 DEFAULT_SCENE.prepare_scene_and_create_context_function = DEFAULT_SCENE_prepare_scene_and_create_context
 DEFAULT_SCENE.scene_start_presentation = DEFAULT_SCENE_presentation
-DEFAULT_SCENE.scene_update_function = None
+DEFAULT_SCENE.scene_update_function = DEFAULT_SCENE_update
 DEFAULT_SCENE.scene_player_input_processing_function = DEFAULT_SCENE_input_processing
 DEFAULT_SCENE.scene_update_presentation = DEFAULT_SCENE_update_presentation
+DEFAULT_SCENE.resume_after_scene_switch_function = DEFAULT_SCENE_resume_after_scene_switch
 DEFAULT_SCENE.after_run_function = None
 DEFAULT_SCENE.scene_end_presentation = None
-
-def should_run_introduction(introduction_scene):
-    if "ran_once" not in introduction_scene.__dir__() or introduction_scene.ran_once is None or introduction_scene.ran_once is False:
-        return True
-    else:
-        return False
 
 def introduction_scene_presentation(game_scene, context):
     print("\tThis is what a presentation could look like.")
@@ -229,7 +236,6 @@ def introduction_scene_update(game_scene, context):
     game_scene.interrupt_scene()
 
 introduction = Game_Scenes.Game_Scene("SIMPLER_TESTER__Introduction")
-introduction.should_run_function = should_run_introduction
 introduction.scene_start_presentation = introduction_scene_presentation
 introduction.scene_update_function = introduction_scene_update
 introduction.scene_player_input_processing_function = None
@@ -237,6 +243,48 @@ introduction.scene_update_presentation = None
 introduction.after_run_function = None
 introduction.scene_end_presentation = None
 
+def travel_to_location_prepare_scene_and_create_context(game_scene, previous_context):
+    new_context = Object()
+    new_context.actor = previous_context.actor
+    new_context.possible_destination_ids = Locations.Location.reachable_locations_default_function(new_context.actor, new_context)
+    new_context.player_action_options = dict()
+    new_context.location_changed = False
+    return new_context
+
+def travel_to_location_scene_presentation(game_scene, context):
+    options_count = 0
+    for possible_destination_id in context.possible_destination_ids:
+        location = Locations.Location.locations_database[possible_destination_id]
+        text = location.short_name
+        print("  [{0}] - {1}".format(options_count, text))
+        context.player_action_options[str(options_count)] = possible_destination_id
+        options_count += 1
+    options_count = 999
+    print("  [{0}] - {1}".format(options_count, "Give up traveling and stay at current location."))
+    context.player_action_options[str(options_count)] = None
+
+def travel_to_location_scene_input_processing(game_scene, context):
+    print("What is your destination?")
+    player_input = input("> ")
+    if player_input == str(999):
+        return None
+    if player_input in context.player_action_options.keys():
+        destination_id = context.player_action_options[player_input]
+        context.actor.location = Locations.Location.locations_database[destination_id]
+        context.location_changed = True
+    else:
+        print("ERROR: Unknown option. Please select a valid option.")
+    game_scene.interrupt_scene()
+    return player_input
+
+travel_to_location_scene = Game_Scenes.Game_Scene("SIMPLER_TESTER__Travel_to_Location")
+travel_to_location_scene.prepare_scene_and_create_context_function = travel_to_location_prepare_scene_and_create_context
+travel_to_location_scene.scene_start_presentation = travel_to_location_scene_presentation
+# travel_to_location_scene.scene_update_function = travel_to_location_scene_update
+travel_to_location_scene.scene_player_input_processing_function = travel_to_location_scene_input_processing
+# travel_to_location_scene.scene_update_presentation = None
+# travel_to_location_scene.after_run_function = None
+# travel_to_location_scene.scene_end_presentation = None
 
 ## CHARACTERS
 prot_name = Names.Character_Names()
@@ -247,6 +295,14 @@ protagonist = Characters.Character("PROTAGONIST", prot_name, "MALE", 25)
 
 ## ACTIONS
 
+def quit_game_action(character_action, character, context):
+    game.stop_game = True
+
+quit_game = Actions.Character_Action("SIMPLER_TESTER__Quit_Game")
+quit_game.player_menu_description = Actions.Character_Action_Description(action_description = "QUIT the GAME", action_description_kind = Actions.Character_Action_Description.ENUM__ACTION_DESCRIPTION_KINDS__TEXT)
+quit_game.execution_function = quit_game_action
+Actions.register_in_database(quit_game)
+
 def examine_self_action(character_action, character, context):
     return Characters.Character.examine_character_default_function(system.protagonist)
 
@@ -256,20 +312,35 @@ examine_self.execution_description = Actions.Character_Action_Description(action
 examine_self.result_description = Actions.Character_Action_Description(action_description = examine_self_action, action_description_kind = Actions.Character_Action_Description.ENUM__ACTION_DESCRIPTION_KINDS__FUNCTION)
 Actions.register_in_database(examine_self)
 
-def quit_game_action(character_action, character, context):
-    game.stop_game = True
+def travel_to_new_location_possibility_check(character_action, character, context):
+    reachable_locations = Locations.Location.reachable_locations_default_function(character, context)
+    if character.location.id not in reachable_locations:
+        if len(reachable_locations) > 0:
+            return True
+    elif len(reachable_locations) > 1:
+        return True
+    return False
 
-quit_game = Actions.Character_Action("SIMPLER_TESTER__Quit_Game")
-quit_game.player_menu_description = Actions.Character_Action_Description(action_description = "QUIT the GAME", action_description_kind = Actions.Character_Action_Description.ENUM__ACTION_DESCRIPTION_KINDS__TEXT)
-quit_game.execution_function = quit_game_action
-Actions.register_in_database(quit_game)
+def travel_to_location_action_scene_starter(character_action, character, context):
+    context.switch_scene_new_scene_id = "SIMPLER_TESTER__Travel_to_Location"
+
+travel_to_location_action = Actions.Character_Action("SIMPLER_TESTER__Travel_to_Location")
+travel_to_location_action.check_action_is_possible_function = travel_to_new_location_possibility_check
+travel_to_location_action.player_menu_description = Actions.Character_Action_Description(action_description = "Go somewhere else...", action_description_kind = Actions.Character_Action_Description.ENUM__ACTION_DESCRIPTION_KINDS__TEXT)
+travel_to_location_action.execution_function = travel_to_location_action_scene_starter
+Actions.register_in_database(travel_to_location_action)
 
 ## LOCATIONS
 
 unending_void = Locations.Location("SIMPLER_TESTER__Unending_Void", in_or_at = "in an", short_name = "Unending Void")
 unending_void.short_descriptor = "Emptiness infinite."
+unending_void.register_in_database()
 
 protagonist.location = unending_void
+
+strangely_tight_location = Locations.Location("SIMPLER_TESTER__Strangely_Tight_Location", in_or_at = "in a", short_name = "strangely tight location")
+strangely_tight_location.short_descriptor = "Confining, yet featureless."
+strangely_tight_location.register_in_database()
 
 def powerPlayFramework_initialize():
     global system
@@ -284,6 +355,7 @@ def game_initialize():
     game.initialize()
     game.register_scene(DEFAULT_SCENE)
     game.register_scene(introduction)
+    game.register_scene(travel_to_location_scene)
     game.inject_scene(introduction.scene_id, None)
 
 print("[+] Initializing game...")
