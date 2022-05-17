@@ -143,4 +143,20 @@ class Age_Group(object):
         else: # elif age < Age_Group.min_age_by_age_group[Age_Group.ENUM__AGE_GROUP__ELDER]:
             return Age_Group.ENUM__AGE_GROUP__ELDER
 
+    @classmethod
+    def generate_random_age_group(cls, include_child_age_group = False):
+        if include_child_age_group:
+            selected_index = random.randint(0, len(cls.ordered_available_age_groups)-1)
+        else:
+            selected_index = random.randint(1, len(cls.ordered_available_age_groups)-1)
+        
+        return cls.ordered_available_age_groups[selected_index]
+
+    @classmethod
+    def generate_random_age(cls, age_group = None, include_child_age_group = False):
+        if age_group is None:
+            age_group = cls.generate_random_age_group(include_child_age_group)
+        min, max = cls.get_age_group_min_and_max(age_group)
+        return random.randint(min, max)
+
 characters_database = {}

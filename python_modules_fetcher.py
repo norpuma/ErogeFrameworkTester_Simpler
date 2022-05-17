@@ -4,7 +4,7 @@ from pathlib import Path
 
 source_controlled_sources_path = "e:/Devel/GitHub/"
 shared_path = source_controlled_sources_path + "erogeGamesResources/"
-destination_path_for_modules = "./PowerPlayFramework/"
+destination_path_for_modules = "E:/Devel/GitHub/ErogeFrameworkTester_Simpler/PowerPlayFramework/"
 
 modules_with_path = {
     "ACTIONS": {

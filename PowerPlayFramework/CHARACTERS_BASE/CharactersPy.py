@@ -17,7 +17,7 @@ def generate_random_character(id = None, gender = None, age_group = None, age = 
     elif age is None:
         age = Age_Group.generate_random_age(age_group)
 
-    names = Character_Names.random(names)
+    names = Character_Names.generate_random_from_name_object(gender, names)
 
     result = Character(id, names, gender, age)
     return result
