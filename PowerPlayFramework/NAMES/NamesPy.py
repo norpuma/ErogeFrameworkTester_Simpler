@@ -218,11 +218,11 @@ class Character_Names(object):
 
     @property
     def first(self):
-        return self._individual_name
+        return self.individual_name
 
     @property
     def first_possessive(self):
-        return self._individual_name
+        return self.individual_name_possessive
 
     @property
     def last(self):
