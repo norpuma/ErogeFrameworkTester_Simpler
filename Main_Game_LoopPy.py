@@ -370,6 +370,7 @@ def spawn_character_scene_input_processing_for_general(game_scene, context, play
         game_scene.interrupt_scene()
     elif player_choice == "SPAWN":
         context.new_character = Characters.generate_random_character(id = None, gender = context.new_character_gender, age = context.new_character_age, names = context.new_character_names)
+        print(">>> New character SPAWNED!")
         game_scene.interrupt_scene()
 
 def spawn_character_scene_names_options(game_scene, context):
